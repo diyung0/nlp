@@ -1,0 +1,63 @@
+# Core ML libraries
+torch
+transformers
+
+# PDF processing
+PyPDF2
+
+# LangChain ecosystem (let pip resolve versions automatically)
+langchain-core
+langchain
+langchain-community
+langchain-experimental
+langchain-text-splitters
+langchain-ollama
+
+# Vector database
+faiss-cpu
+
+# Additional dependencies
+numpy
+pydantic
+requests
+
+
+
+# # 기본 패키지들 먼저
+# pip install torch transformers PyPDF2 numpy
+
+# # LangChain 패키지들을 하나씩
+# pip install langchain-core
+# pip install langchain
+# pip install langchain-community
+# pip install langchain-text-splitters
+# pip install langchain-experimental
+# pip install langchain-ollama
+
+# # 마지막에 FAISS
+# pip install faiss-cpu
+
+
+# pip install langchain-ollama
+
+# # bge-m3 모델 다운로드 (시간이 좀 걸림)
+# ollama pull bge-m3
+
+# 설치 확인
+# python -c "
+# from langchain_ollama import OllamaEmbeddings
+# embeddings_model = OllamaEmbeddings(model='bge-m3')
+# test_embedding = embeddings_model.embed_query('test text')
+# print('✅ Ollama 연결 성공!')
+# print(f'임베딩 차원: {len(test_embedding)}')
+# "
+
+# # Ollama 서버가 실행 중인지 확인
+# curl http://localhost:11434/api/tags
+
+# # 만약 연결이 안 되면 서버 시작
+# ollama serve &
+
+
+# 터미널에서 실행
+# /opt/anaconda3/envs/cs224n_dfp/bin/python final.py
