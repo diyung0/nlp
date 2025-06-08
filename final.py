@@ -14,7 +14,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_ollama import OllamaEmbeddings
 from langchain_community.vectorstores import FAISS
-
+from bert_score import score
 
 import pandas as pd
 import time
@@ -35,14 +35,18 @@ class QAGenerator(nn.Module):
         return next(self.model.parameters()).device
     
     @torch.no_grad()
-    def generate_answer(self, context, question, max_length=50, temperature=0.1, top_p=0.9):
+    def generate_answer(self, context, question, max_length=50, temperature=0.7, top_p=0.95):
         """주어진 컨텍스트와 질문으로 답변 생성 (Few-shot 프롬프트 포함)"""
         
         # 프롬프트 구성
-        prompt = f"""You must answer using ONLY the information in the context below and respond with either YES or NO.
-        Context: {context}
-        Question: {question}
-        Answer: """
+        prompt = f"""Please answer the question below using only the information provided in the context.
+        If the context does not provide enough information, say "The document does not provide enough information."
+        
+        Context:
+        {context}
+        Question:
+        {question}
+        Answer:"""
 
         # 토크나이징
         inputs = self.tokenizer.encode(prompt, return_tensors='pt', max_length=1024, truncation=True)
@@ -86,7 +90,7 @@ class QAGenerator(nn.Module):
         generated_text = self.tokenizer.decode(inputs[0], skip_special_tokens=True)
 
         # print(f"\n\n\nGenerated text: {generated_text}\n\n\n")
-
+ 
         # 답변 부분만 추출 (마지막 Answer: 이후 부분)
         if "Answer:" in generated_text:
             answer_parts = generated_text.split("Answer:")
@@ -113,7 +117,7 @@ def chunk_text(text, chunk_method, embeddings_model=None):
     if chunk_method == 'character':
         text_splitter = CharacterTextSplitter(
             separator="\n",
-            chunk_size=1500,
+            chunk_size=128,
             chunk_overlap=100,
             length_function=len,
             is_separator_regex=False
@@ -203,48 +207,57 @@ def main(args):
     questions = [
         {
             # Q1 ⭐️
-            "question": "Can the duration of study be reduced by up to one year in the Integrated Program?"
-            # YES
+            "question": "By how much can the duration of study be reduced through the Integrated Program?"
+            # article 2
         },
         {
             # Q2 ⭐️ ⭐️
-            "question": "Is the Undergraduate-Graduate Integrated Program designed to reduce the duration of study?"
-            # YES
+            "question": "What is the intended benefit of the Undergraduate-Graduate Integrated Program regarding academic timeline?"
+            # article 2
         },
         {
             # Q3
-            "question": "Is the Integrated Program designed to reduce the duration of study?"
+            "question": "What is the purpose of the Integrated Program in terms of study duration?"
+            # article 2
         },
         {
             # Q4 ⭐️ ❌
-            "question": "Do applicants need to submit specific documents to apply for the Integrated Program?"
+            "question": "What documents are required to apply for the Integrated Program?"
+            # article 4
         },
         {
             # Q5 ⭐️
-            "question": "Is the selection process for the Integrated Program based on document screening?"
+            "question": "How are applicants selected for the Integrated Program?"
+            # article 5
         },
         {
             # Q6
-            "question": "Can students apply for the Integrated Program after completing 4 semesters"
+            "question": "When are students eligible to apply for the Integrated Program based on their semester and earned credits?"
+            # article 3.1
         },
         {
             # Q7
-            "question": "Is a GPA of 3.3 or higher required to apply for the Integrated Program?"
+            "question": "What is the minimum GPA requirement to be eligible for the Integrated Program?"
+            # article 3.2
         },
         {
             # Q8 
-            "question": "Do applicants need a recommendation from their undergraduate department head?"
+            "question": "Whose recommendations are required for applying to the Integrated Program?"
+            # article 3.3 & 3.4
         },
         {
             # Q9
-            "question": "Are graduate courses recognized as undergraduate graduation credits?"
+            "question": "Can graduate courses taken in the Integrated Program count toward undergraduate graduation requirements?"
+            # article 7.2
         },
         {
             # Q10
-            "question": "Can students take up to 6 credits of graduate courses per semester before graduating?"
+            "question": "How many graduate credits can students take each semester before completing their undergraduate program?"
+            # article 7.1
         }
     ]
 
+    candidates = [] #BERT용
     results_data = []
     start_time = time.time()
 
@@ -252,7 +265,7 @@ def main(args):
         q_start = time.time()  # 질문 시작 시간
 
         # 상위 3개의 관련 청크를 검색
-        results = vector_store.similarity_search(query=question["question"], k=1)
+        results = vector_store.similarity_search(query=question["question"], k=3)
         combined_context = "\n".join([result.page_content for result in results])
 
         print(f"\n--- Example {i} ---")
@@ -270,11 +283,53 @@ def main(args):
             "answer": answer,
             "elapsed_time_sec": round(q_time, 3)
         })
+        candidates.append(answer)
 
         print(f"Answer: {answer}")
         print(f"⏱ Time for this question: {q_time:.2f} seconds")
         print("-" * 80)
+    
 
+    # 실제 답변과 예측된 답변 리스트
+    references = [
+        # Q1
+        "The Integrated Program allows for the reduction of the duration of study by up to one year each for the bachelor's, master's, and integrated master's-doctoral degrees.",
+
+        # Q2
+        "The primary benefit of the Undergraduate-Graduate Integrated Program is that it enables students to complete their academic degrees in a shorter time by reducing the total duration of study by up to one year at each level.",
+
+        # Q3
+        "The purpose of the Integrated Program is to shorten the duration of study for bachelor's, master's, and integrated degrees by up to one year each.",
+
+        # Q4
+        "Applicants must submit an application form for the Integrated Program, a copy of their undergraduate academic transcript, a research plan, and a recommendation letter from the graduate advisor.",
+
+        # Q5    
+        "Applicants are selected through document screening, which considers undergraduate grades, research plans, recommendation letters, and other criteria set by the department.",
+
+        # Q6
+        "Students are eligible to apply for the Integrated Program after completing 4 to 7 semesters, provided they have earned at least 64, 80, 95, or 110 credits respectively, excluding seasonal session credits in the application semester.",
+
+        # Q7
+        "A cumulative GPA of 3.3 or higher is required up to the semester in which the student applies for the Integrated Program.",
+
+        # Q8
+        "Applicants need recommendations from both the head of their undergraduate department and the advisor of the intended graduate department. If applying to a different or interdisciplinary graduate department, an additional recommendation is required from the graduate department head.",
+
+        # Q9
+        "Graduate courses, except for shared undergraduate-graduate courses, are not recognized as undergraduate graduation credits. However, up to 12 credits of graduate courses can be completed before graduation, and some may be recognized as graduate credits later with approval.",
+
+        # Q10
+        "Students may take up to 6 credits of graduate courses per semester before undergraduate graduation, including shared undergraduate-graduate courses."
+    ]
+
+    # BERTScore 계산
+    P, R, F1 = score(candidates, references, lang="en", verbose=True)
+
+    # 각 점수 출력
+    print(f"Precision: {P.mean():.4f}")
+    print(f"Recall: {R.mean():.4f}")
+    print(f"F1: {F1.mean():.4f}")
     total_time = time.time() - start_time
     print(f"\n⏱ Total Time Elapsed: {total_time:.2f} seconds")
 

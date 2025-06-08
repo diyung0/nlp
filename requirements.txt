@@ -21,7 +21,8 @@ numpy
 pydantic
 requests
 
-
+# evaluation metric
+bert_score
 
 # # 기본 패키지들 먼저
 # pip install torch transformers PyPDF2 numpy
