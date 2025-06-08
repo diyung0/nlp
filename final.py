@@ -35,7 +35,7 @@ class QAGenerator(nn.Module):
         return next(self.model.parameters()).device
     
     @torch.no_grad()
-    def generate_answer(self, context, question, max_length=50, temperature=0.7, top_p=0.95):
+    def generate_answer(self, context, question, max_length=100, temperature=0.3, top_p=0.9):
         """주어진 컨텍스트와 질문으로 답변 생성 (Few-shot 프롬프트 포함)"""
         
         # 프롬프트 구성
@@ -89,8 +89,8 @@ class QAGenerator(nn.Module):
         # 디코딩하여 텍스트로 변환
         generated_text = self.tokenizer.decode(inputs[0], skip_special_tokens=True)
 
-        # print(f"\n\n\nGenerated text: {generated_text}\n\n\n")
- 
+        print(f"\n\n\nGenerated text: {generated_text}\n\n\n")
+
         # 답변 부분만 추출 (마지막 Answer: 이후 부분)
         if "Answer:" in generated_text:
             answer_parts = generated_text.split("Answer:")
@@ -132,7 +132,11 @@ def chunk_text(text, chunk_method, embeddings_model=None, chunk_size=128):
         )
     elif chunk_method == 'semantic':
         if embeddings_model:
-            text_splitter = SemanticChunker(embeddings_model)
+            text_splitter = SemanticChunker(
+                embeddings_model,
+                breakpoint_threshold_type="percentile",
+                breakpoint_threshold_amount=25  # 상위 25%에서 분할
+            )
         else:
             raise ValueError("Embeddings model must be provided for semantic chunking")
     else:
@@ -266,8 +270,16 @@ def main(args):
         q_start = time.time()  # 질문 시작 시간
 
         # 상위 3개의 관련 청크를 검색
-        results = vector_store.similarity_search(query=question["question"], k=3)
-        combined_context = "\n".join([result.page_content for result in results])
+        # results = vector_store.similarity_search(query=question["question"], k=5)
+
+        # 관련성 점수도 함께 확인
+        results_with_scores = vector_store.similarity_search_with_score(query=question["question"], k=5)
+        print(f"Retrieved {len(results_with_scores)} results for question {i}: {question['question']}")
+
+        # 점수가 너무 낮은 것들 필터링
+        filtered_results = [doc for doc, score in results_with_scores if score < 0.8]  # 임계값 조정
+
+        combined_context = "\n".join([result.page_content for result in filtered_results[:3]])
 
         print(f"\n--- Example {i} ---")
         print(f"Question: {question['question']}")
