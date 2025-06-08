@@ -89,7 +89,7 @@ class QAGenerator(nn.Module):
         # 디코딩하여 텍스트로 변환
         generated_text = self.tokenizer.decode(inputs[0], skip_special_tokens=True)
 
-        print(f"\n\n\nGenerated text: {generated_text}\n\n\n")
+        # print(f"\n\n\nGenerated text: {generated_text}\n\n\n")
 
         # 답변 부분만 추출 (마지막 Answer: 이후 부분)
         if "Answer:" in generated_text:
@@ -97,10 +97,6 @@ class QAGenerator(nn.Module):
             answer = answer_parts[-1].strip()
         else:
             answer = "Could not generate an answer."
-
-        # 불필요한 부분 제거
-        if '\n' in answer:
-            answer = answer.split('\n')[0].strip()
 
         return answer
 
@@ -273,11 +269,11 @@ def main(args):
         # results = vector_store.similarity_search(query=question["question"], k=5)
 
         # 관련성 점수도 함께 확인
-        results_with_scores = vector_store.similarity_search_with_score(query=question["question"], k=5)
+        results_with_scores = vector_store.similarity_search_with_score(query=question["question"], k=7)
         print(f"Retrieved {len(results_with_scores)} results for question {i}: {question['question']}")
 
         # 점수가 너무 낮은 것들 필터링
-        filtered_results = [doc for doc, score in results_with_scores if score < 0.8]  # 임계값 조정
+        filtered_results = [doc for doc, score in results_with_scores if score < 0.7]  # 임계값 조정
 
         combined_context = "\n".join([result.page_content for result in filtered_results[:3]])
 
