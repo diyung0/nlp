@@ -131,7 +131,7 @@ def chunk_text(text, chunk_method, embeddings_model=None, chunk_size=128):
             text_splitter = SemanticChunker(
                 embeddings_model,
                 breakpoint_threshold_type="percentile",
-                breakpoint_threshold_amount=25  # 상위 25%에서 분할
+                breakpoint_threshold_amount=60
             )
         else:
             raise ValueError("Embeddings model must be provided for semantic chunking")
