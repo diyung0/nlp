@@ -49,7 +49,7 @@ class QAGenerator(nn.Module):
         Answer:"""
 
         # 토크나이징
-        inputs = self.tokenizer.encode(prompt, return_tensors='pt', max_length=1024, truncation=True)
+        inputs = self.tokenizer.encode(prompt, return_tensors='pt', max_length=900, truncation=True)
         inputs = inputs.to(self.get_device())
         
         # 생성
