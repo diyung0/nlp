@@ -112,12 +112,12 @@ def pdf_to_text(pdf_path):
     return "\n".join(pages)
 
 
-def chunk_text(text, chunk_method, embeddings_model=None):
+def chunk_text(text, chunk_method, embeddings_model=None, chunk_size=128):
     """Chunk text using the specified method."""
     if chunk_method == 'character':
         text_splitter = CharacterTextSplitter(
             separator="\n",
-            chunk_size=128,
+            chunk_size=chunk_size,
             chunk_overlap=100,
             length_function=len,
             is_separator_regex=False
@@ -125,7 +125,7 @@ def chunk_text(text, chunk_method, embeddings_model=None):
     elif chunk_method == 'recursive':
         text_splitter = RecursiveCharacterTextSplitter(
             separators=["\n\n", "\n", " ", ""],
-            chunk_size=1500,
+            chunk_size=chunk_size,
             chunk_overlap=100,
             length_function=len,
             is_separator_regex=False
@@ -175,11 +175,12 @@ def main(args):
         text = f.read()
 
     # 청킹 전략을 인자로 받아서 텍스트를 청크로 나누기
-    print(f"Chunking text using method: {args.chunk_method}")
+    print(f"Chunking text using method: {args.chunk_method} and chunk size: {args.chunk_size}")
     documents = chunk_text(
         text,
         chunk_method=args.chunk_method,
-        embeddings_model=OllamaEmbeddings(model="bge-m3") if args.chunk_method == 'semantic' else None
+        embeddings_model=OllamaEmbeddings(model="bge-m3") if args.chunk_method == 'semantic' else None,
+        chunk_size=args.chunk_size
     )
     print(f"Number of chunks created: {len(documents)}")
 
@@ -345,6 +346,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--pdf_path", type=str, default="data/test_real.pdf")
     parser.add_argument("--chunk_method", type=str, choices=['character', 'recursive', 'semantic'], default='recursive')
+    parser.add_argument("--chunk_size", type=int, choices=[128, 256, 512, 1024], default=128) 
     args = parser.parse_args()
     return args
 
